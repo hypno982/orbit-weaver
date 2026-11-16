@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Orbit Weaver</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="stage" width="1280" height="720" aria-label="Orbit Weaver play field"></canvas>
+<div id="hud" aria-live="polite"></div>
+<div id="banner" aria-live="assertive"></div>
+<div id="menu">
+  <h1>ORBIT WEAVER</h1>
+  <p class="tag">Bend a comet's path with gravity. Thread every gate. Do not fall in.</p>
+  <div class="keys">
+    <span><b>A</b> / <b>D</b> thrust</span>
+    <span><b>W</b> / <b>S</b> trim</span>
+    <span><b>Shift</b> brake</span>
+    <span><b>Space</b> pulse</span>
+    <span><b>P</b> pause</span>
+    <span><b>R</b> restart</span>
+  </div>
+  <button id="play" type="button">LAUNCH</button>
+  <p class="fine">Six systems. Each one pulls harder than the last.</p>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

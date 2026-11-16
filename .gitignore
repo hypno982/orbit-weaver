@@ -1,0 +1,5 @@
+out/
+node_modules/
+*.tar.gz
+capture.py
+dossier-copy.json
