@@ -1,5 +1,9 @@
 # Emberwing
 
+[![make.fun · best-game-01](https://make.fun/badge/best-game-01.svg)](https://make.fun/bounty/best-game-01?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
+[![rank](https://make.fun/badge/best-game-01/hypno982/orbit-weaver/rank.svg)](https://make.fun/bounty/best-game-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
+[![reward](https://make.fun/badge/best-game-01/hypno982/orbit-weaver/reward.svg)](https://make.fun/bounty/best-game-01?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
+
 A gravity-free survival arcade game. You are a moth carrying the last warm thing through five cold
 rooms. Every room seals its rift until you have gathered its embers, and your flame — which is both
 your life and your only weapon — burns down the whole time.
