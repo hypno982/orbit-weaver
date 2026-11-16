@@ -1,72 +1,55 @@
-// Keyboard state. Kept dumb on purpose: it records what is held and never decides anything itself.
+// Keyboard. Raw key state in, a normalised steering vector out; also tracks the
+// edge-triggered presses the game needs (pulse, pause, restart, confirm).
 
-const BINDINGS = {
-  forward: ['KeyW', 'ArrowUp'],
-  back: ['KeyS', 'ArrowDown'],
-  up: ['KeyA', 'ArrowLeft'],
-  down: ['KeyD', 'ArrowRight'],
-  brake: ['ShiftLeft', 'ShiftRight'],
+const DOWN = new Set();
+const EDGE = new Set();
+
+const MAP = {
+  ArrowUp: 'up', KeyW: 'up',
+  ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
 };
 
-export class Controls {
-  constructor() {
-    this.held = new Set();
-    this.pulsePressed = false;
-    this.pausePressed = false;
-    this.restartPressed = false;
+export function attachControls(target) {
+  target.addEventListener('keydown', (e) => {
+    const k = MAP[e.code] || e.code;
+    if (!DOWN.has(k)) EDGE.add(k);
+    DOWN.add(k);
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      e.preventDefault();
+    }
+  });
+  target.addEventListener('keyup', (e) => {
+    DOWN.delete(MAP[e.code] || e.code);
+  });
+  // A tab switch should not leave a key stuck down.
+  target.addEventListener('blur', () => DOWN.clear());
+}
 
-    window.addEventListener('keydown', (event) => {
-      if (event.repeat) return;
-      this.held.add(event.code);
-      if (event.code === 'Space') {
-        this.pulsePressed = true;
-        event.preventDefault();
-      }
-      if (event.code === 'KeyP') this.pausePressed = true;
-      if (event.code === 'KeyR') this.restartPressed = true;
-    });
-
-    window.addEventListener('keyup', (event) => {
-      this.held.delete(event.code);
-    });
-
-    window.addEventListener('blur', () => {
-      this.held.clear();
-    });
+export function steering() {
+  let x = 0, y = 0;
+  if (DOWN.has('left')) x -= 1;
+  if (DOWN.has('right')) x += 1;
+  if (DOWN.has('up')) y -= 1;
+  if (DOWN.has('down')) y += 1;
+  if (x !== 0 && y !== 0) {
+    const inv = Math.SQRT1_2;
+    x *= inv;
+    y *= inv;
   }
+  return { x, y };
+}
 
-  pressed(action) {
-    const keys = BINDINGS[action];
-    for (const key of keys) if (this.held.has(key)) return true;
-    return false;
-  }
+// True once per physical press. Call once per frame, after using the result.
+export function pressed(name) {
+  return EDGE.has(name);
+}
 
-  /** The input vector the ship reads. */
-  snapshot() {
-    return {
-      forward: this.pressed('forward'),
-      back: this.pressed('back'),
-      up: this.pressed('up'),
-      down: this.pressed('down'),
-      brake: this.pressed('brake'),
-    };
-  }
+export function clearEdges() {
+  EDGE.clear();
+}
 
-  consumePulse() {
-    const hit = this.pulsePressed;
-    this.pulsePressed = false;
-    return hit;
-  }
-
-  consumePause() {
-    const hit = this.pausePressed;
-    this.pausePressed = false;
-    return hit;
-  }
-
-  consumeRestart() {
-    const hit = this.restartPressed;
-    this.restartPressed = false;
-    return hit;
-  }
+export function anyConfirm() {
+  return EDGE.has('Space') || EDGE.has('Enter') || EDGE.has('KeyR');
 }

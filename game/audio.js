@@ -1,90 +1,81 @@
-// Sound, synthesised in WebAudio. No files, no network: every noise the game makes is built here.
+// Sound, built from oscillators so the game ships no audio files at all. Every
+// cue is a short synth blip: collecting, pulsing, opening, taking a hit, dying.
 
-import { seeded, rangeOf } from './math.js';
+let ctx = null;
+let master = null;
+let muted = false;
 
-export class Audio {
-  constructor() {
-    this.ctx = null;
-    this.master = null;
-    this.enabled = true;
-    this.rand = seeded(0xf00d);
+export function initAudio() {
+  if (ctx) {
+    if (ctx.state === 'suspended') ctx.resume();
+    return;
   }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  ctx = new AC();
+  master = ctx.createGain();
+  master.gain.value = 0.22;
+  master.connect(ctx.destination);
+}
 
-  /** Browsers refuse an AudioContext until a gesture, so the first press or click starts it. */
-  unlock() {
-    if (this.ctx !== null) return;
-    const Ctor = window.AudioContext ?? window.webkitAudioContext;
-    if (Ctor === undefined) {
-      this.enabled = false;
-      return;
-    }
-    this.ctx = new Ctor();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 0.24;
-    this.master.connect(this.ctx.destination);
-  }
+export function toggleMute() {
+  muted = !muted;
+  if (master) master.gain.value = muted ? 0 : 0.22;
+  return muted;
+}
 
-  tone(freq, duration, type = 'sine', gain = 0.5, slideTo = null) {
-    if (!this.enabled || this.ctx === null) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const amp = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
-    if (slideTo !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), now + duration);
-    amp.gain.setValueAtTime(0.0001, now);
-    amp.gain.exponentialRampToValueAtTime(gain, now + 0.012);
-    amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(amp);
-    amp.connect(this.master);
-    osc.start(now);
-    osc.stop(now + duration + 0.02);
-  }
+export function isMuted() {
+  return muted;
+}
 
-  noise(duration, gain = 0.4, filterFreq = 1400) {
-    if (!this.enabled || this.ctx === null) return;
-    const now = this.ctx.currentTime;
-    const frames = Math.floor(this.ctx.sampleRate * duration);
-    const buffer = this.ctx.createBuffer(1, frames, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < frames; i += 1) {
-      data[i] = rangeOf(this.rand, -1, 1) * (1 - i / frames);
-    }
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = filterFreq;
-    const amp = this.ctx.createGain();
-    amp.gain.value = gain;
-    src.connect(filter);
-    filter.connect(amp);
-    amp.connect(this.master);
-    src.start(now);
-  }
+function blip(freq, dur, type, gain, slideTo) {
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, t);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain || 0.3, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g);
+  g.connect(master);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
 
-  gate() {
-    this.tone(660, 0.14, 'triangle', 0.4, 990);
-    this.tone(990, 0.2, 'sine', 0.22, 1320);
-  }
+export function sfxCollect(chain) {
+  // Pitch climbs with the chain, so the combo is something you can hear.
+  const step = Math.min(chain, 8) - 1;
+  blip(520 * Math.pow(1.09, step), 0.13, 'triangle', 0.26);
+}
 
-  dock() {
-    this.tone(392, 0.18, 'sine', 0.42, 587);
-    this.tone(587, 0.3, 'sine', 0.3, 784);
-    this.tone(784, 0.42, 'triangle', 0.22, 988);
-  }
+export function sfxPulse() {
+  blip(210, 0.30, 'sine', 0.34, 80);
+  blip(420, 0.16, 'triangle', 0.16, 200);
+}
 
-  crash() {
-    this.noise(0.45, 0.5, 800);
-    this.tone(140, 0.4, 'sawtooth', 0.3, 42);
-  }
+export function sfxHurt() {
+  blip(150, 0.26, 'sawtooth', 0.26, 60);
+}
 
-  pulse() {
-    this.tone(220, 0.16, 'square', 0.22, 520);
-    this.noise(0.12, 0.16, 2400);
-  }
+export function sfxRift() {
+  blip(330, 0.22, 'sine', 0.24, 500);
+  setTimeout(() => blip(660, 0.30, 'sine', 0.22, 880), 110);
+}
 
-  ui() {
-    this.tone(520, 0.08, 'triangle', 0.24, 700);
-  }
+export function sfxDive() {
+  blip(300, 0.24, 'triangle', 0.2, 620);
+  setTimeout(() => blip(450, 0.24, 'triangle', 0.2, 900), 90);
+}
+
+export function sfxDeath() {
+  blip(260, 0.55, 'sawtooth', 0.24, 50);
+  setTimeout(() => blip(130, 0.7, 'sine', 0.2, 40), 120);
+}
+
+export function sfxWin() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((n, i) => setTimeout(() => blip(n, 0.3, 'triangle', 0.22), i * 120));
 }

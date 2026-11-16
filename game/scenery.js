@@ -1,81 +1,100 @@
-// The star field and the gravity wells. Both are pure draw functions: they read state and paint, they
-// never mutate the sim, so a screenshot scene can call them on a scratch canvas.
+// Scenery: the cold rock the moth flies through. Generated once per depth from
+// a seed so the room looks the same every run but different from the last one.
 
-import { VIEW } from './config.js';
-import { seeded, rangeOf, TAU } from './math.js';
+import { VIEW, COLORS } from './config.js';
+import { makeRng, randRange } from './math.js';
 
-/** Build a fixed star field once. Two layers so the parallax reads without a camera. */
-export function makeStarField(count = 260) {
-  const rand = seeded(0x5eed1);
-  const near = [];
-  const far = [];
-  for (let i = 0; i < count; i += 1) {
-    const star = {
-      x: rangeOf(rand, 0, VIEW.width),
-      y: rangeOf(rand, 0, VIEW.height),
-      r: rangeOf(rand, 0.4, 1.5),
-      a: rangeOf(rand, 0.15, 0.7),
-      phase: rangeOf(rand, 0, TAU),
-    };
-    (star.r > 1.0 ? near : far).push(star);
+export function buildScenery(depth) {
+  const rng = makeRng(depth * 7919 + 13);
+
+  // Distant rock spires: three parallax layers, back to front.
+  const layers = [];
+  for (let l = 0; l < 3; l++) {
+    const spires = [];
+    const count = 7 + l * 3;
+    for (let i = 0; i < count; i++) {
+      spires.push({
+        x: randRange(rng, -40, VIEW.w + 40),
+        w: randRange(rng, 40, 130) * (1 - l * 0.18),
+        h: randRange(rng, 60, 240) * (1 - l * 0.2),
+        lean: randRange(rng, -0.3, 0.3),
+      });
+    }
+    layers.push(spires);
   }
-  return { near, far };
+
+  // Floating grains: slow dust that makes empty space feel like a place.
+  const dust = [];
+  for (let i = 0; i < 90; i++) {
+    dust.push({
+      x: randRange(rng, 0, VIEW.w),
+      y: randRange(rng, 0, VIEW.h),
+      r: randRange(rng, 0.5, 1.9),
+      sp: randRange(rng, 4, 16),
+      drift: randRange(rng, -6, 6),
+    });
+  }
+
+  return { layers, dust, depth };
 }
 
-export function drawStars(ctx, field, time) {
-  ctx.fillStyle = '#06080f';
-  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+export function drawScenery(ctx, scene, time) {
+  // Base wash: colder as the run goes deeper.
+  const coldness = Math.min(1, scene.depth / 6);
+  const g = ctx.createRadialGradient(VIEW.w * 0.5, VIEW.h * 0.45, 60, VIEW.w * 0.5, VIEW.h * 0.5, VIEW.w * 0.75);
+  g.addColorStop(0, mix(COLORS.bg1, '#122a3d', coldness));
+  g.addColorStop(1, mix(COLORS.bg0, '#050a12', coldness));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VIEW.w, VIEW.h);
 
-  for (const star of field.far) {
-    ctx.globalAlpha = star.a * 0.65;
-    ctx.fillStyle = '#9fb6e4';
-    ctx.fillRect(star.x, star.y, star.r, star.r);
-  }
-  for (const star of field.near) {
-    const twinkle = 0.72 + 0.28 * Math.sin(time * 1.4 + star.phase);
-    ctx.globalAlpha = star.a * twinkle;
-    ctx.fillStyle = '#eaf2ff';
+  // Rock spires, back to front, each layer darker and more opaque.
+  scene.layers.forEach((spires, l) => {
+    const alpha = 0.20 + l * 0.22;
+    ctx.fillStyle = l === 2 ? COLORS.rockEdge : COLORS.rock;
+    ctx.globalAlpha = alpha;
+    for (const s of spires) {
+      ctx.beginPath();
+      ctx.moveTo(s.x - s.w * 0.5, VIEW.h + 20);
+      ctx.lineTo(s.x - s.w * 0.12 + s.lean * s.h, VIEW.h - s.h);
+      ctx.lineTo(s.x + s.w * 0.18 + s.lean * s.h, VIEW.h - s.h * 0.86);
+      ctx.lineTo(s.x + s.w * 0.5, VIEW.h + 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // Dust drifts upward, wrapping. Cheap, and it sells motion while hovering.
+  ctx.fillStyle = COLORS.text;
+  for (const d of scene.dust) {
+    const y = (d.y - time * d.sp) % VIEW.h;
+    const yy = y < 0 ? y + VIEW.h : y;
+    const x = d.x + Math.sin(time * 0.4 + d.drift) * 8;
+    ctx.globalAlpha = 0.10 + d.r * 0.06;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, TAU);
+    ctx.arc(x, yy, d.r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
 
-/** A well: a hot core, a corona, and the horizon ring that means death. */
-export function drawWell(ctx, well, time, focused) {
-  const pulse = 1 + Math.sin(time * 1.8 + well.x * 0.01) * 0.03;
-  const core = well.horizon * 0.52 * pulse;
-
-  const corona = ctx.createRadialGradient(well.x, well.y, core * 0.4, well.x, well.y, well.horizon * 4.2);
-  corona.addColorStop(0, 'rgba(255, 196, 92, 0.5)');
-  corona.addColorStop(0.28, 'rgba(255, 122, 74, 0.22)');
-  corona.addColorStop(0.62, 'rgba(150, 60, 160, 0.1)');
-  corona.addColorStop(1, 'rgba(20, 10, 40, 0)');
-  ctx.fillStyle = corona;
-  ctx.beginPath();
-  ctx.arc(well.x, well.y, well.horizon * 4.2, 0, TAU);
-  ctx.fill();
-
-  const body = ctx.createRadialGradient(well.x - core * 0.3, well.y - core * 0.35, core * 0.1, well.x, well.y, core);
-  body.addColorStop(0, '#fff8e6');
-  body.addColorStop(0.5, '#ffc65e');
-  body.addColorStop(1, '#c2410c');
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(well.x, well.y, core, 0, TAU);
-  ctx.fill();
-
-  ctx.strokeStyle = focused ? 'rgba(255, 95, 109, 0.85)' : 'rgba(255, 95, 109, 0.42)';
-  ctx.lineWidth = focused ? 2.4 : 1.4;
-  ctx.setLineDash([7, 7]);
-  ctx.beginPath();
-  ctx.arc(well.x, well.y, well.horizon, 0, TAU);
-  ctx.stroke();
-  ctx.setLineDash([]);
+// Vignette keeps the eye on the middle of the room.
+export function drawVignette(ctx) {
+  const g = ctx.createRadialGradient(VIEW.w / 2, VIEW.h / 2, VIEW.h * 0.42, VIEW.w / 2, VIEW.h / 2, VIEW.w * 0.72);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VIEW.w, VIEW.h);
 }
 
-/** Draw only the wells; the caller decides the order against the gates and the ship. */
-export function drawWells(ctx, wells, time, activeWell) {
-  for (const well of wells) drawWell(ctx, well, time, well === activeWell);
+function mix(a, b, t) {
+  const pa = hex(a), pb = hex(b);
+  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+function hex(h) {
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 }

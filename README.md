@@ -1,8 +1,11 @@
-# Orbit Weaver
+# Emberwing
 
-A gravity-slingshot arcade game. You fly one comet through six systems. Every sun bends your path and
-every gate has to be threaded in order. There is no engine and no build step: twelve small ES modules,
-plain canvas 2D, and WebAudio for the sound.
+A gravity-free survival arcade game. You are a moth carrying the last warm thing through five cold
+rooms. Every room seals its rift until you have gathered its embers, and your flame — which is both
+your life and your only weapon — burns down the whole time.
+
+No engine, no build step, no library: thirteen small ES modules, plain canvas 2D, and sound made
+from oscillators so the game ships no audio files at all.
 
 Built as an entry for [make.fun's best-game-01 bounty](https://make.fun/bounty/best-game-01).
 
@@ -12,65 +15,67 @@ Built as an entry for [make.fun's best-game-01 bounty](https://make.fun/bounty/b
 node serve.ts       # http://localhost:8080
 ```
 
-Or serve `game/` with any static file server and open `game/index.html`. The game runs offline: it
-loads nothing over the network and vendors no library.
+Or serve `game/` with any static file server and open `game/index.html`. The game runs fully
+offline: it loads nothing over the network and vendors nothing.
 
 | key | action |
 | --- | --- |
-| `W` / `↑` | thrust |
-| `S` / `↓` | retro thrust |
-| `A` / `D` | lateral trim |
-| `Shift` | brake |
-| `Space` | pulse (a one-shot kick along your heading, costs fuel) |
+| `W` `A` `S` `D` / arrow keys | fly |
+| `Space` | pulse — pulls embers in, shoves the cold away, costs flame |
 | `P` | pause |
-| `R` | restart |
+| `M` | mute |
 
 ## The loop
 
-Each system gives you gates to thread and one sun (or four) to survive. Clear every gate and the dock
-opens; dock to finish the system. Fall inside a sun's horizon ring and you lose the system and retry it.
-Six systems, each pulling harder than the last, then a final tally with a par-time bonus.
+1. **Gather every ember.** The rift in each room stays sealed and dim until all seven are in. The
+   label above it counts what is left.
+2. **Flame is your life.** It drains constantly, faster in deeper rooms. Embers refill it. At zero
+   the run ends.
+3. **Pulse costs flame.** It is the only way to pull a distant ember in or push a hazard off you, so
+   every defensive move spends the resource you need to survive.
+4. **Chain for score.** Embers gathered within four seconds of each other build a multiplier up to
+   ×8. Taking a hit breaks the chain.
+5. **Five rooms, then dawn.** Each room adds hazards and speed. Reaching the fifth rift wins.
 
-The trick is that gravity is the only real engine you have. Thrust is weak and fuel is finite, so the
-fast line through a system is a slingshot: come in wide, let the sun turn you, and spend the pulse on
-the exit vector.
+## The source
 
-## How it is built
+One file per job, named for what it does:
 
-One file, one job:
-
-| file | what it owns |
-| --- | --- |
-| `game/main.js` | the session: state, the fixed-step loop, the screenshot scenes |
-| `game/config.js` | every tuning number and all six systems |
-| `game/ship.js` | the comet's flight model and gravity integration |
-| `game/scenery.js` | the star field and the wells |
-| `game/gates.js` | gates, crossings and the dock |
-| `game/comet.js` | the comet's trail, hull and engine flare |
-| `game/effects.js` | particles and screen shake |
-| `game/audio.js` | synthesised sound, no files |
-| `game/controls.js` | the keyboard state |
-| `game/hud.js` | the HUD and the title/result overlays |
-| `game/render.js` | one frame, drawn from state |
-| `game/math.js` | vector maths and a seeded generator |
-| `main.ts` | hands `game/` and `screenshots/` to `/output` and writes `dossier.json` |
-
-The simulation is a fixed 1/120 s step and the renderer never mutates state, so a frame is a pure
-function of the state. That is what makes the screenshots reproducible: every shot is
-`?shot=<scene>&seed=<n>`, drawn by the game's own code at a fixed simulated time, never cropped, edited
-or composited.
+- `game/config.js` — every tuning number, in one place
+- `game/math.js` — vectors, clamps, the seeded RNG that makes a run reproducible
+- `game/controls.js` — key state in, a steering vector out, edge-triggered presses
+- `game/moth.js` — the player: thrust, drag, flame, pulse, damage, wing animation
+- `game/ember.js` — the collectibles: drift, pulse attraction, fade-out, collection
+- `game/hazard.js` — the cold: chase behaviour, wandering, pulse knockback, contact
+- `game/rift.js` — the exit: placement, sealed-to-open transition, entry test
+- `game/effects.js` — particles, pulse rings, screen shake
+- `game/scenery.js` — the parallax rock, dust and vignette, generated per depth from a seed
+- `game/audio.js` — every sound cue, synthesised from oscillators
+- `game/hud.js` — the flame meter, ember pips, score, chain, and all four overlay screens
+- `game/main.js` — the phase machine: title, depth card, play, pause, defeat, dawn
+- `game/boot.js` — finds the canvas and starts the loop
 
 ## Screenshots
 
-`screenshots/` holds four real renders:
+`screenshots/` holds four real renders of the game running in Chrome at 1280×720, taken by
+`capture_emberwing.py`, which drives the game through its own debug handle so each shot is the
+game's own code drawing:
 
-1. `1-start.jpg` — the title, over the first system
-2. `2-play.jpg` — mid-run in Twin Lanterns, HUD live
-3. `3-end.jpg` — a lost run: two systems held, the third failed
-4. `4-win.jpg` — the victory tally with the par bonus
+1. `1-title.jpg` — the title screen: premise, three rules, the start prompt
+2. `2-play.jpg` — mid-run: flame meter, ember pips, chain multiplier, a sealed rift and its count
+3. `3-defeat.jpg` — the defeat screen with the final score and the restart prompt
+4. `4-dawn.jpg` — the win screen after five rooms, with the restart prompt
 
-Regenerate them with `python3 capture.py http://127.0.0.1:8080` (async Playwright, headless Chromium).
+## Hand-in
 
-## Licence
+```
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+```
 
-MIT. See `LICENSE`.
+`main.ts` copies `game/` and `screenshots/` into the output directory and writes `dossier.json` with
+the kit's own `buildDossier`, so the bytes match what the gate rebuilds. It runs twice and writes
+the same bytes both times.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

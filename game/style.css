@@ -1,123 +1,58 @@
+/* Emberwing: the page is only a frame. The canvas does all the drawing, so the
+   CSS keeps a dark stage, centres it, and never lets the browser letterbox it
+   with a scrollbar. */
+
 :root {
-  --ink: #06080f;
-  --deep: #0b1120;
-  --comet: #7ce7ff;
-  --warm: #ffcf6b;
-  --danger: #ff5f6d;
-  --gate: #8affc1;
-  --text: #dbe6ff;
+  --bg: #05090f;
+  --edge: #16202e;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-html, body {
+html,
+body {
   height: 100%;
+  background: var(--bg);
   overflow: hidden;
-  background: radial-gradient(circle at 50% 40%, #101a30 0%, var(--ink) 70%);
-  color: var(--text);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #dce8f7;
+  /* No text selection: dragging during play should never highlight the page. */
   user-select: none;
+  -webkit-user-select: none;
+}
+
+#frame {
+  position: relative;
+  /* The canvas keeps 16:9 and shrinks to fit whichever side runs out first. */
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  box-shadow: 0 0 0 1px var(--edge), 0 24px 80px rgba(0, 0, 0, 0.8);
 }
 
 #stage {
   display: block;
-  width: 100vw;
-  height: 100vh;
-  object-fit: contain;
-  touch-action: none;
+  width: 100%;
+  height: 100%;
+  /* Keeps the 1280x720 drawing crisp when the browser scales it. */
+  image-rendering: auto;
+  cursor: none;
+  background: var(--bg);
 }
 
-#hud {
-  position: fixed;
-  inset: 18px 22px auto 22px;
-  display: flex;
-  gap: 28px;
-  font-size: 13px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  pointer-events: none;
-  text-shadow: 0 0 12px rgba(124, 231, 255, 0.35);
-}
-
-#hud .cell { display: flex; flex-direction: column; gap: 4px; }
-#hud .label { color: #6b7ea8; font-size: 10px; }
-#hud .value { color: var(--comet); font-size: 19px; font-weight: 700; }
-#hud .value.warn { color: var(--warm); }
-#hud .value.bad { color: var(--danger); }
-
-#banner {
-  position: fixed;
-  inset: 46% 0 auto 0;
-  text-align: center;
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 260ms ease;
-  text-shadow: 0 0 30px rgba(138, 255, 193, 0.5);
-}
-
-#banner.show { opacity: 1; }
-
-#menu {
+/* A soft glow behind the frame so the game does not look pasted on a black page. */
+body::before {
+  content: "";
   position: fixed;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  background: radial-gradient(circle at 50% 45%, rgba(11, 17, 32, 0.82), rgba(6, 8, 15, 0.97));
-  backdrop-filter: blur(3px);
-  text-align: center;
-  padding: 32px;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 176, 87, 0.06), transparent 60%);
 }
-
-#menu.hidden { display: none; }
-
-#menu h1 {
-  font-size: clamp(38px, 8vw, 84px);
-  letter-spacing: 0.22em;
-  font-weight: 900;
-  background: linear-gradient(180deg, #ffffff, var(--comet) 55%, #2f7fa8);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-#menu .tag { color: #9fb2d8; max-width: 520px; line-height: 1.85; font-size: 14px; }
-
-#menu .keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 22px;
-  justify-content: center;
-  max-width: 620px;
-  color: #7f92b8;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-
-#menu .keys b { color: var(--warm); }
-
-#menu button {
-  margin-top: 10px;
-  padding: 16px 54px;
-  font: inherit;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 0.3em;
-  color: #04121a;
-  background: linear-gradient(180deg, #b7f5ff, var(--comet) 55%, #3aa2c9);
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: 0 14px 40px rgba(124, 231, 255, 0.3);
-  transition: transform 140ms ease, box-shadow 140ms ease;
-}
-
-#menu button:hover { transform: translateY(-2px); box-shadow: 0 18px 48px rgba(124, 231, 255, 0.42); }
-#menu button:active { transform: translateY(0); }
-
-#menu .fine { color: #55688c; font-size: 11px; letter-spacing: 0.16em; margin-top: 4px; }
