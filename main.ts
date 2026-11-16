@@ -62,12 +62,28 @@ function main() {
     throw new Error(`game/ is ${game.bytes} bytes, over the ${CAPS.game_max_bytes} allowed`);
   }
 
+  // The judge sees the game only through these pictures, so refuse to hand in a
+  // run with the wrong number of them rather than let the gate reject it later.
+  const shotsDir = join(OUT, 'screenshots');
+  const shots = existsSync(shotsDir)
+    ? readdirSync(shotsDir).filter((n) => !n.startsWith('.') && /\.(png|jpe?g)$/i.test(n))
+    : [];
+  if (shots.length < 3 || shots.length > CAPS.screenshots.max) {
+    throw new Error(`screenshots/ holds ${shots.length} images, need 3 to ${CAPS.screenshots.max}`);
+  }
+  for (const name of shots) {
+    const size = statSync(join(shotsDir, name)).size;
+    if (size > CAPS.screenshots.max_bytes) {
+      throw new Error(`screenshots/${name} is ${size} bytes, over the ${CAPS.screenshots.max_bytes} allowed`);
+    }
+  }
+
   // The dossier must be the bytes buildDossier writes from what is on disk.
   const dossier = buildDossier(OUT, CAPS);
   writeFileSync(join(OUT, 'dossier.json'), dossier);
 
   process.stdout.write(
-    `emberwing: ${game.n} files, ${game.bytes} bytes, dossier ${Buffer.byteLength(dossier)} bytes\n`,
+    `emberwing: ${game.n} files, ${game.bytes} bytes, ${shots.length} shots, dossier ${Buffer.byteLength(dossier)} bytes\n`,
   );
 }
 
